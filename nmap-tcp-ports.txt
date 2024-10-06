@@ -1,0 +1,69 @@
+# Nmap 7.94SVN scan initiated Sun Oct  6 13:17:52 2024 as: nmap -sS -p 4767,29754,33107 -A -v -oN nmap-tcp-ports.txt 127.0.0.1
+Nmap scan report for localhost (127.0.0.1)
+Host is up (0.00010s latency).
+
+PORT      STATE SERVICE VERSION
+4767/tcp  open  unknown
+29754/tcp open  unknown
+33107/tcp open  unknown
+| fingerprint-strings: 
+|   FourOhFourRequest: 
+|     HTTP/1.0 404 Not Found
+|     Date: Sun, 06 Oct 2024 11:18:27 GMT
+|     Content-Length: 19
+|     Content-Type: text/plain; charset=utf-8
+|     404: Page Not Found
+|   GenericLines, Help, Kerberos, LDAPSearchReq, LPDString, RTSPRequest, SSLSessionReq, TLSSessionReq, TerminalServerCookie: 
+|     HTTP/1.1 400 Bad Request
+|     Content-Type: text/plain; charset=utf-8
+|     Connection: close
+|     Request
+|   GetRequest, HTTPOptions: 
+|     HTTP/1.0 404 Not Found
+|     Date: Sun, 06 Oct 2024 11:17:59 GMT
+|     Content-Length: 19
+|     Content-Type: text/plain; charset=utf-8
+|_    404: Page Not Found
+1 service unrecognized despite returning data. If you know the service/version, please submit the following fingerprint at https://nmap.org/cgi-bin/submit.cgi?new-service :
+SF-Port33107-TCP:V=7.94SVN%I=7%D=10/6%Time=670271E7%P=x86_64-pc-linux-gnu%
+SF:r(GenericLines,67,"HTTP/1\.1\x20400\x20Bad\x20Request\r\nContent-Type:\
+SF:x20text/plain;\x20charset=utf-8\r\nConnection:\x20close\r\n\r\n400\x20B
+SF:ad\x20Request")%r(GetRequest,8F,"HTTP/1\.0\x20404\x20Not\x20Found\r\nDa
+SF:te:\x20Sun,\x2006\x20Oct\x202024\x2011:17:59\x20GMT\r\nContent-Length:\
+SF:x2019\r\nContent-Type:\x20text/plain;\x20charset=utf-8\r\n\r\n404:\x20P
+SF:age\x20Not\x20Found")%r(HTTPOptions,8F,"HTTP/1\.0\x20404\x20Not\x20Foun
+SF:d\r\nDate:\x20Sun,\x2006\x20Oct\x202024\x2011:17:59\x20GMT\r\nContent-L
+SF:ength:\x2019\r\nContent-Type:\x20text/plain;\x20charset=utf-8\r\n\r\n40
+SF:4:\x20Page\x20Not\x20Found")%r(RTSPRequest,67,"HTTP/1\.1\x20400\x20Bad\
+SF:x20Request\r\nContent-Type:\x20text/plain;\x20charset=utf-8\r\nConnecti
+SF:on:\x20close\r\n\r\n400\x20Bad\x20Request")%r(Help,67,"HTTP/1\.1\x20400
+SF:\x20Bad\x20Request\r\nContent-Type:\x20text/plain;\x20charset=utf-8\r\n
+SF:Connection:\x20close\r\n\r\n400\x20Bad\x20Request")%r(SSLSessionReq,67,
+SF:"HTTP/1\.1\x20400\x20Bad\x20Request\r\nContent-Type:\x20text/plain;\x20
+SF:charset=utf-8\r\nConnection:\x20close\r\n\r\n400\x20Bad\x20Request")%r(
+SF:TerminalServerCookie,67,"HTTP/1\.1\x20400\x20Bad\x20Request\r\nContent-
+SF:Type:\x20text/plain;\x20charset=utf-8\r\nConnection:\x20close\r\n\r\n40
+SF:0\x20Bad\x20Request")%r(TLSSessionReq,67,"HTTP/1\.1\x20400\x20Bad\x20Re
+SF:quest\r\nContent-Type:\x20text/plain;\x20charset=utf-8\r\nConnection:\x
+SF:20close\r\n\r\n400\x20Bad\x20Request")%r(Kerberos,67,"HTTP/1\.1\x20400\
+SF:x20Bad\x20Request\r\nContent-Type:\x20text/plain;\x20charset=utf-8\r\nC
+SF:onnection:\x20close\r\n\r\n400\x20Bad\x20Request")%r(FourOhFourRequest,
+SF:8F,"HTTP/1\.0\x20404\x20Not\x20Found\r\nDate:\x20Sun,\x2006\x20Oct\x202
+SF:024\x2011:18:27\x20GMT\r\nContent-Length:\x2019\r\nContent-Type:\x20tex
+SF:t/plain;\x20charset=utf-8\r\n\r\n404:\x20Page\x20Not\x20Found")%r(LPDSt
+SF:ring,67,"HTTP/1\.1\x20400\x20Bad\x20Request\r\nContent-Type:\x20text/pl
+SF:ain;\x20charset=utf-8\r\nConnection:\x20close\r\n\r\n400\x20Bad\x20Requ
+SF:est")%r(LDAPSearchReq,67,"HTTP/1\.1\x20400\x20Bad\x20Request\r\nContent
+SF:-Type:\x20text/plain;\x20charset=utf-8\r\nConnection:\x20close\r\n\r\n4
+SF:00\x20Bad\x20Request");
+Warning: OSScan results may be unreliable because we could not find at least 1 open and 1 closed port
+Aggressive OS guesses: Linux 4.4 - 4.9 (95%), Linux 3.1 (95%), Linux 3.2 (95%), AXIS 210A or 211 Network Camera (Linux 2.6.17) (95%), Linux 2.6.32 (93%), Linux 3.7 - 3.10 (93%), Linux 5.0 - 5.7 (93%), ASUS RT-N56U WAP (Linux 3.4) (93%), Linux 3.16 (93%), Linux 2.6.39 - 3.2 (93%)
+No exact OS matches for host (test conditions non-ideal).
+Uptime guess: 8.405 days (since Sat Sep 28 03:37:25 2024)
+Network Distance: 0 hops
+TCP Sequence Prediction: Difficulty=259 (Good luck!)
+IP ID Sequence Generation: All zeros
+
+Read data files from: /usr/bin/../share/nmap
+OS and Service detection performed. Please report any incorrect results at https://nmap.org/submit/ .
+# Nmap done at Sun Oct  6 13:21:05 2024 -- 1 IP address (1 host up) scanned in 193.25 seconds

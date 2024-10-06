@@ -11,10 +11,18 @@ from openai import OpenAI
 # Constants
 TEMPERATURE = 0
 MODEL = "gpt-4o-mini"
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+BLUE='\033[0;34m'
+MAGENTA='\033[0;35m'
+ITALIC='\033[3m'
+BOLD='\033[1m'
+NC='\033[0m'
 
 # Function to prompt the user for their OpenAI API key (security measures)
 def get_api_key():
-    apiKey = input("Please enter your OpenAI API key: ")
+    apiKey = input(BLUE + BOLD + "Please enter your OpenAI API key: " + NC)
     return apiKey
 
 # Function to set the OpenAI API key
@@ -24,7 +32,7 @@ def set_openai_api_key(apiKey):
     return client
 
 def set_host():
-    host = input("Please enter host to be scanned: ")
+    host = input(BLUE + BOLD + "Please enter host to be scanned: " + NC)
     return host
 
 def prepare_context(host):
@@ -37,6 +45,7 @@ def prepare_context(host):
         You are allowed to use only public tools that will not create a Denial-of-Service attack.
         When not said how to print out the results, print only the console command. Do not add back ticks.
         Do not add any python or bash comments when answering.
+        Use sudo when you have to (for example, nmap -sS).
         Current host to scan: 
     """
 
@@ -52,29 +61,42 @@ def main():
 
     systemPrompt, context = prepare_context(host)
 
-    userQuery = "Scan ports of defined host and print out only open ones."
+    userQuery = """
+    Scan all ports of defined hosts. Output only numbers of ports that are open on these hosts.
+    Remove the /tcp or /udp from the end of port output.
+    """
 
-    messages=[
-        {"role": "system", "content": systemPrompt},
-        {"role": "user", "content": userQuery},
-        {"role": "assistant", "content": context}
-    ]
+    messages = [{"role": "system", "content": systemPrompt}, {"role": "user", "content": userQuery},{"role": "assistant", "content": context}]
 
-    #chatCompletion = client.chat.completions.create(messages = messages, model = MODEL, temperature = TEMPERATURE)
-    #chatCompletion = chatCompletion.choices[0].message.content.strip()
-    chatCompletion = "nmap -p- 127.0.0.1 | grep 'open' | awk '{print $1}'"
-
-    ### DEBUG
-    print("Command: ", chatCompletion)
+    chatCompletion = client.chat.completions.create(messages = messages, model = MODEL, temperature = TEMPERATURE)
+    chatCompletion = chatCompletion.choices[0].message.content.strip()
 
     # Execute the command and capture the output
     outputText = subprocess.run(chatCompletion, shell=True, capture_output=True, text=True)
-    print("Output: ", outputText)
-
     openPorts = outputText.stdout
 
+    userQuery = """
+    Take open ports that I will add at the end and scan them aggressively gathering as much information as possible. 
+    Save this information into nmap-tcp-ports.txt
+    Ports: 
+    """
+    userQuery += openPorts
+
+    messages = [{"role": "system", "content": systemPrompt}, {"role": "user", "content": userQuery},{"role": "assistant", "content": context}]
+
+    chatCompletion = client.chat.completions.create(messages = messages, model = MODEL, temperature = TEMPERATURE)
+    chatCompletion = chatCompletion.choices[0].message.content.strip()
+
     ### DEBUG
-    print("Output: ", openPorts)
+    print(RED + BOLD + "Command: " + chatCompletion + NC)
+
+    # Execute the command and capture the output
+    outputText = subprocess.run(chatCompletion, shell=True, capture_output=True, text=True)
+    detailsPorts = outputText.stdout
+
+    ### DEBUG
+    print(RED + BOLD + "outputText: " + outputText + NC)
+
 
 if __name__ == "__main__":
     main()
