@@ -90,6 +90,7 @@ def create_banner(client, debug):
     """
     userQuery = 'Return me a banner for application called "LLMNS". Also, include current date, time, and geo-localization.'
     
+    debug.write("\n" + "#" * 50 + "\n")
     messages = [{"role": "system", "content": systemPrompt}, {"role": "user", "content": userQuery},{"role": "assistant", "content": context}]
     chatCompletion = client.chat.completions.create(messages = messages, model = MODEL, temperature = TEMPERATURE)
     chatCompletion = chatCompletion.choices[0].message.content.strip()
@@ -121,7 +122,6 @@ def prepare_context(hosts):
 # Main function
 def main():
     debug = open('openai-debug.txt', 'a')
-    debug.write("#" * 30 + "\nStart of session\n")
 
     # Set the OpenAI API key, hosts, and print welcoming banner
     apiKey = get_api_key()
@@ -175,7 +175,6 @@ def main():
         userQuery = """
         Scan 100 top ports (most common, --top-ports) of host {host.ipAddress}. Output only numbers of ports that are open on these hosts.
         Remove the /tcp or /udp from the end of port output.
-        Filter out the end of the output from nmap which relates to "unrecognized service".
         """
 
         messages = [{"role": "system", "content": systemPrompt}, {"role": "user", "content": userQuery},{"role": "assistant", "content": context}]
