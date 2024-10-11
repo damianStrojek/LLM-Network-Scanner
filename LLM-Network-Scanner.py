@@ -11,18 +11,49 @@ from openai import OpenAI
 # Constants
 TEMPERATURE = 0
 MODEL = "gpt-4o-mini"
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[0;33m'
-BLUE='\033[0;34m'
-MAGENTA='\033[0;35m'
+RED='\033[1;31m'
+GREEN='\033[1;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[1;34m'
+MAGENTA='\033[1;35m'
 ITALIC='\033[3m'
-BOLD='\033[1m'
 NC='\033[0m'
+
+class NetworkHost:
+    def __init__(self, ipAddress, openPorts=None, services=None):
+        self.ipAddress = ipAddress
+        self.openPorts = openPorts if openPorts else []
+        self.services = services if services else {}
+
+    def add_port(self, port, service=None):
+        if port not in self.openPorts:
+            self.openPorts.append(port)
+            if service:
+                self.services[port] = service
+
+    def remove_port(self, port):
+        if port in self.openPorts:
+            self.openPorts.remove(port)
+            if port in self.services:
+                del self.services[port]
+
+    def list_ports(self):
+        return self.openPorts
+
+    def list_services(self):
+        return self.services
+
+    def debug(self):
+        print(f"Host IP: {self.ipAddress}\nOpen Ports: {self.openPorts}\nServices: {self.services}")
+        return
+
+    def __str__(self):
+        hostInfo = f"Host IP: {self.ipAddress}\nOpen Ports: {self.openPorts}\nServices: {self.services}"
+        return hostInfo
 
 # Prompt the user for their OpenAI API key (security measures)
 def get_api_key():
-    apiKey = input(BLUE + BOLD + "Please enter your OpenAI API key: " + NC)
+    apiKey = input(YELLOW + "[?] " + BLUE + "Please enter your OpenAI API key: " + NC)
     return apiKey
 
 # Set the OpenAI API key
@@ -33,23 +64,23 @@ def set_openai_api_key(apiKey):
 
 # Set hosts that will be scanned
 def set_hosts():
-    user_input = input(BLUE + BOLD + "Please enter host or hosts (text file) to be scanned: " + NC)
+    user_input = input(YELLOW + "[?] " + BLUE + "Please enter host or hosts (text file) to be scanned: " + NC)
 
     if user_input.endswith(".txt"):
         try:
             with open(user_input, 'r') as file:
                 hosts = file.read()
-            print(f"Hosts from the file:\n{hosts}")
             return hosts
         except FileNotFoundError:
-            print(f"File {user_input} doesn't exist.")
+            print(f"[!] File {user_input} doesn't exist.")
+            exit()
 
     host = user_input.strip()
     print(f"Given host: {host}")
     return host
 
 # Print out welcoming banner
-def create_banner(client):
+def create_banner(client, debug):
     systemPrompt = "Your task is to return a banner that will be shown as the first thing after running the application."
     context = """
     You should only return the text that can be instantly printed out. Not functions or anything else.
@@ -62,9 +93,9 @@ def create_banner(client):
     messages = [{"role": "system", "content": systemPrompt}, {"role": "user", "content": userQuery},{"role": "assistant", "content": context}]
     chatCompletion = client.chat.completions.create(messages = messages, model = MODEL, temperature = TEMPERATURE)
     chatCompletion = chatCompletion.choices[0].message.content.strip()
+    debug.write(chatCompletion + "\n")
     
-
-    print("\n" + GREEN + BOLD + chatCompletion + NC + "\n")
+    print("\n" + GREEN + chatCompletion + NC + "\n")
 
     return
 
@@ -89,108 +120,148 @@ def prepare_context(hosts):
 
 # Main function
 def main():
-    # Gather, set the OpenAI API key, hosts, and print welcoming banner
+    debug = open('openai-debug.txt', 'a')
+    debug.write("#" * 30 + "\nStart of session\n")
+
+    # Set the OpenAI API key, hosts, and print welcoming banner
     apiKey = get_api_key()
     client = set_openai_api_key(apiKey)
-    create_banner(client)
+    create_banner(client, debug)
     hosts = set_hosts()
-
+    activeHosts = []
+    
     # Set up online hosts and prepare context for later queries
     systemPrompt, context = prepare_context(hosts)
 
     ### Test out status of hosts
     userQuery = """
     Print out a command to test if all of the defined hosts are up or not. You should use ping.
-    The command should print out all of the hosts that are up, one per line. If all of them are down, print out 'False'."
+    The command should print out all of the hosts that are up, one per line.
+    If some hosts are up and some hosts are down, print out only ip addresses of the active hosts.
+    If all of hosts are down, output an empty string.
     """
 
     messages = [{"role": "system", "content": systemPrompt}, {"role": "user", "content": userQuery},{"role": "assistant", "content": context}]
     chatCompletion = client.chat.completions.create(messages = messages, model = MODEL, temperature = TEMPERATURE)
     chatCompletion = chatCompletion.choices[0].message.content.strip()
-
-    # Command
-    print(RED + BOLD + chatCompletion + NC)
+    debug.write(chatCompletion + "\n")
 
     # Execute the command and capture the output
     outputText = subprocess.run(chatCompletion, shell=True, capture_output=True, text=True)
     onlineHosts = outputText.stdout
 
-    if(onlineHosts == 'False'):
-        print(RED + BOLD + "All hosts are down" + NC)
+    if(onlineHosts == ""):
+        print(YELLOW + "[!] " + RED + "All hosts are down" + NC)
         exit()
     else:
         systemPrompt, context = prepare_context(onlineHosts)
 
-    ### Query for gathering information about open ports
+    ipAddresses = onlineHosts.splitlines()
+    ipAddresses = [ip for ip in ipAddresses if ip]
 
-    userQuery = """
-    Scan all ports of defined hosts. Output only numbers of ports that are open on these hosts.
-    Remove the /tcp or /udp from the end of port output.
-    """
+    for ip in ipAddresses:
+        newHost = NetworkHost(ipAddress = ip)
+        activeHosts.append(newHost)
+    
+    #!!! Class
+    print(", ".join(map(str, activeHosts)))
 
-    messages = [{"role": "system", "content": systemPrompt}, {"role": "user", "content": userQuery},{"role": "assistant", "content": context}]
-    chatCompletion = client.chat.completions.create(messages = messages, model = MODEL, temperature = TEMPERATURE)
-    chatCompletion = chatCompletion.choices[0].message.content.strip()
+    for host in activeHosts:
 
-    # Command
-    print(RED + BOLD + chatCompletion + NC)
+        print(YELLOW + "[*] " + MAGENTA + "Scanning host " + host.ipAddress + NC)
 
-    # Execute the command and capture the output
-    outputText = subprocess.run(chatCompletion, shell=True, capture_output=True, text=True)
-    openPorts = outputText.stdout
+        ### Query for gathering information about open ports
 
-    # Output
-    print(RED + BOLD + "Open Ports: " + NC)
-    print(openPorts)
+        userQuery = """
+        Scan 100 top ports (most common, --top-ports) of host {host.ipAddress}. Output only numbers of ports that are open on these hosts.
+        Remove the /tcp or /udp from the end of port output.
+        Filter out the end of the output from nmap which relates to "unrecognized service".
+        """
 
-    ### Query for aggressive scan of open ports
+        messages = [{"role": "system", "content": systemPrompt}, {"role": "user", "content": userQuery},{"role": "assistant", "content": context}]
+        chatCompletion = client.chat.completions.create(messages = messages, model = MODEL, temperature = TEMPERATURE)
+        chatCompletion = chatCompletion.choices[0].message.content.strip()
+        debug.write(chatCompletion + "\n")
 
-    userQuery = """
-    Take open ports, that will be added at the end of this query, and scan them aggressively gathering as much information as possible. 
-    Save this information into nmap-tcp-ports.txt
-    Ports: 
-    """
-    userQuery += openPorts
+        #!!! Command
+        print(RED + chatCompletion + NC)
 
-    messages = [{"role": "system", "content": systemPrompt}, {"role": "user", "content": userQuery},{"role": "assistant", "content": context}]
-    chatCompletion = client.chat.completions.create(messages = messages, model = MODEL, temperature = TEMPERATURE)
-    chatCompletion = chatCompletion.choices[0].message.content.strip()
+        outputText = subprocess.run(chatCompletion, shell=True, capture_output=True, text=True)
+        openPorts = outputText.stdout
 
-    # Command
-    print(RED + BOLD + chatCompletion + NC)
+        hostPorts = openPorts.splitlines()
+        hostPorts = [port for port in hostPorts if port]
 
-    # Execute the command and capture the output
-    outputText = subprocess.run(chatCompletion, shell=True, capture_output=True, text=True)
-    detailedPorts = outputText.stdout
+        # Prepare individual hosts
+        for port in hostPorts:
+            host.add_port(port=port)
 
-    # Output
-    print(RED + BOLD + "\nAggresive Scan: " + NC)
-    print(detailedPorts)
+        #!!! Class
+        print(", ".join(map(str, activeHosts)))
 
-    ### Prepare tools for next step of discovery
+        #!!! Output
+        if(openPorts == ""):
+            print(YELLOW + "[!] " + RED + "No open ports." + NC)
+            exit()
+        else:
+            print(YELLOW + "[*] " + MAGENTA + "Open Ports: " + NC)
+            print(openPorts)
 
-    userQuery = """
-    Take information, that will be added at the end of this query, and prepare one-liner that will scan each port with the tools that are designed 
-    for this specific port and service. Do not use nmap in this step.
-    Information from nmap:
-    """
-    userQuery += detailedPorts
+        
 
-    messages = [{"role": "system", "content": systemPrompt}, {"role": "user", "content": userQuery},{"role": "assistant", "content": context}]
-    chatCompletion = client.chat.completions.create(messages = messages, model = MODEL, temperature = TEMPERATURE)
-    chatCompletion = chatCompletion.choices[0].message.content.strip()
+        ### Query for aggressive scan of open ports
 
-    # Command
-    print(RED + BOLD + chatCompletion + NC)
+        userQuery = """
+        Take open ports, that will be added at the end of this query, and scan them aggressively gathering as much information as possible. 
+        Save this information into nmap-tcp-ports-{hosts.ipAddress}.txt
+        Ports: 
+        """
+        userQuery += openPorts
 
-    # Execute the command and capture the output
-    outputText = subprocess.run(chatCompletion, shell=True, capture_output=True, text=True)
-    scanServices = outputText.stdout
+        messages = [{"role": "system", "content": systemPrompt}, {"role": "user", "content": userQuery},{"role": "assistant", "content": context}]
+        chatCompletion = client.chat.completions.create(messages = messages, model = MODEL, temperature = TEMPERATURE)
+        chatCompletion = chatCompletion.choices[0].message.content.strip()
+        debug.write(chatCompletion + "\n")
 
-    # Output
-    print(RED + BOLD + "Specific Tools: " + NC)
-    print(scanServices)
+        #!!! Command
+        print(RED + chatCompletion + NC)
 
+        # Execute the command and capture the output
+        outputText = subprocess.run(chatCompletion, shell=True, capture_output=True, text=True)
+        detailedPorts = outputText.stdout
+
+        # Output
+        print(YELLOW + "\n[*]" + MAGENTA + " Aggresive Scan: " + NC)
+        print(detailedPorts)
+
+        ### Prepare tools for next step of discovery
+
+        userQuery = """
+        Take information, that will be added at the end of this query, and prepare one-liner that will scan each port with the tools that are designed 
+        for this specific port and service. Do not use nmap in this step.
+        Information from nmap:
+        """
+        userQuery += detailedPorts
+
+        messages = [{"role": "system", "content": systemPrompt}, {"role": "user", "content": userQuery},{"role": "assistant", "content": context}]
+        chatCompletion = client.chat.completions.create(messages = messages, model = MODEL, temperature = TEMPERATURE)
+        chatCompletion = chatCompletion.choices[0].message.content.strip()
+        debug.write(chatCompletion + "\n")
+
+        #!!! Command
+        print(RED + chatCompletion + NC)
+
+        # Execute the command and capture the output
+        #outputText = subprocess.run(chatCompletion, shell=True, capture_output=True, text=True)
+        #scanServices = outputText.stdout
+        scanServices = "tools..."
+
+        #!!! Output
+        print(YELLOW + "[*] " + MAGENTA + "Specific Tools: " + NC)
+        print(scanServices)
+
+    debug.close()
+    exit()
 
 if __name__ == "__main__":
     main()
