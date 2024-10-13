@@ -1,11 +1,14 @@
 # LLM-Network-Scanner
 
-Current setup allows users to utilize Natura Language Processing done by OpenAI and:
-- Create a custom welcoming banner for application
+LLM-Network-Scanner is a powerful tool that leverages the OpenAI API and advanced Natural Language Processing (NLP) models to identify and scan network hosts. By using state-of-the-art language models, it automates the process of host discovery, vulnerability scanning, and network analysis. This tool helps network administrators efficiently assess and secure their infrastructure by providing intelligent insights, scanning results, and potential vulnerability reports for each identified host in the network.
+
+Main functionalities:
+- Create a custom welcoming banner
 - Check the current status of given hosts
 - Scan online hosts for open ports
-- Aggressively scan open ports
+- Perform a detailed scan on open ports
 - Find out best tools to dive deeper into specific services
+- Generate a custom summary in the image format
 
 ## Demo
 
