@@ -1,6 +1,8 @@
 #
-# LLM Netowrk Scanner
+# LLM Network Scanner
 # Copyright (C) 2024 Damian Strojek
+#
+# This file is an addition to LLM-Network-Scanner.py used to test out future ideas
 #
 
 # Imports

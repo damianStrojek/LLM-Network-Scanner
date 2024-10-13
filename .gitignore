@@ -3,7 +3,7 @@
 
 # Ignore hosts and findings
 hosts.txt
-nmap-tcp-ports-*.txt
+nmap-aggresive-*.txt
 
 # Ignore debug file with outputs from OpenAI API
-openai-debug.txt
+openai-log.txt
