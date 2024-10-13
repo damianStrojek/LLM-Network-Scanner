@@ -23,7 +23,7 @@ class NetworkHost:
     def __init__(self, ipAddress, openPorts=None, services=None):
         self.ipAddress = ipAddress
         self.openPorts = openPorts if openPorts else []
-        self.services = services if services else {}
+        self.services = services if services else []
 
     def add_port(self, port, service=None):
         if port not in self.openPorts:
@@ -101,21 +101,21 @@ def create_banner(client, debug):
     return
 
 # Prepare context for future queries
-def prepare_context(hosts):
-    systemPrompt = "You are a penetration tester for one of the biggest companies in the world."
+def prepare_context():
+    systemPrompt = """
+    You are a penetration tester for one of the biggest companies in the world.
+    The idea for following prompts is to prepare and execute an infrastracture penetration test on given IP address.
+    """
 
     context = """
         You are tasked with coming up with technical answers to given questions.
         When said, create only commands that can be copy-pasted into /bin/bash console on Kali Linux 2024 system.
-        The idea for following prompts is to prepare and execute an infrastracture penetration test on given IP address.
         You are allowed to use only public tools that will not create a Denial-of-Service attack.
-        When not said how to print out the results, print only the console command. Do not add back ticks.
+        When not said how to print out the results, print only the console command.
+        Do not add back ticks.
         Do not add any python or bash comments when answering.
-        Use sudo when you have to (for example, nmap -sS).
-        Current hosts to scan: 
+        Use sudo when you have to.
     """
-
-    context += hosts
 
     return systemPrompt, context
 
@@ -131,11 +131,12 @@ def main():
     activeHosts = []
     
     # Set up online hosts and prepare context for later queries
-    systemPrompt, context = prepare_context(hosts)
+    systemPrompt, context = prepare_context()
 
     ### Test out status of hosts
-    userQuery = """
-    Print out a command to test if all of the defined hosts are up or not. You should use ping.
+    userQuery = f"""
+    Print out a command to test if all of the following hosts are up or not: {hosts}
+    You should use ping.
     The command should print out all of the hosts that are up, one per line.
     If some hosts are up and some hosts are down, print out only ip addresses of the active hosts.
     If all of hosts are down, output an empty string.
@@ -154,7 +155,7 @@ def main():
         print(YELLOW + "[!] " + RED + "All hosts are down" + NC)
         exit()
     else:
-        systemPrompt, context = prepare_context(onlineHosts)
+        print(YELLOW + "[*] " + MAGENTA + "Following hosts are up: " + onlineHosts.strip().replace('\n', ', ') + NC)
 
     ipAddresses = onlineHosts.splitlines()
     ipAddresses = [ip for ip in ipAddresses if ip]
@@ -162,18 +163,18 @@ def main():
     for ip in ipAddresses:
         newHost = NetworkHost(ipAddress = ip)
         activeHosts.append(newHost)
-    
-    #!!! Class
-    print(", ".join(map(str, activeHosts)))
 
-    for host in activeHosts:
-
-        print(YELLOW + "[*] " + MAGENTA + "Scanning host " + host.ipAddress + NC)
+    for currentHost in activeHosts:
+        
+        print(GREEN + "\n###")
+        print(YELLOW + "[*] " + MAGENTA + "Scanning host " + currentHost.ipAddress)
+        print(GREEN + "###\n" + NC)
 
         ### Query for gathering information about open ports
 
-        userQuery = """
-        Scan 100 top ports (most common, --top-ports) of host {host.ipAddress}. Output only numbers of ports that are open on these hosts.
+        userQuery = f"""
+        Scan 50 top ports (most common, --top-ports) of host {currentHost.ipAddress}.
+        Output only numbers of ports that are 'open' or 'filtered' on this specific host.
         Remove the /tcp or /udp from the end of port output.
         """
 
@@ -182,8 +183,7 @@ def main():
         chatCompletion = chatCompletion.choices[0].message.content.strip()
         debug.write(chatCompletion + "\n")
 
-        #!!! Command
-        print(RED + chatCompletion + NC)
+        print(YELLOW + "[DEBUG1] " + RED + chatCompletion + NC)
 
         outputText = subprocess.run(chatCompletion, shell=True, capture_output=True, text=True)
         openPorts = outputText.stdout
@@ -193,37 +193,26 @@ def main():
 
         # Prepare individual hosts
         for port in hostPorts:
-            host.add_port(port=port)
+            currentHost.add_port(port=port)
 
-        #!!! Class
-        print(", ".join(map(str, activeHosts)))
-
-        #!!! Output
         if(openPorts == ""):
             print(YELLOW + "[!] " + RED + "No open ports." + NC)
             exit()
-        else:
-            print(YELLOW + "[*] " + MAGENTA + "Open Ports: " + NC)
-            print(openPorts)
-
-        
 
         ### Query for aggressive scan of open ports
 
-        userQuery = """
-        Take open ports, that will be added at the end of this query, and scan them aggressively gathering as much information as possible. 
-        Save this information into nmap-tcp-ports-{hosts.ipAddress}.txt
-        Ports: 
+        userQuery = f"""
+        Take following ports that are open on host {currentHost.ipAddress} and scan them aggressively gathering as much information as possible:
+        {openPorts}
+        Save this information locally into nmap-tcp-ports-{currentHost.ipAddress}.txt
         """
-        userQuery += openPorts
 
         messages = [{"role": "system", "content": systemPrompt}, {"role": "user", "content": userQuery},{"role": "assistant", "content": context}]
         chatCompletion = client.chat.completions.create(messages = messages, model = MODEL, temperature = TEMPERATURE)
         chatCompletion = chatCompletion.choices[0].message.content.strip()
         debug.write(chatCompletion + "\n")
 
-        #!!! Command
-        print(RED + chatCompletion + NC)
+        print(YELLOW + "[DEBUG2] " + RED + chatCompletion + NC)
 
         # Execute the command and capture the output
         outputText = subprocess.run(chatCompletion, shell=True, capture_output=True, text=True)
@@ -235,25 +224,25 @@ def main():
 
         ### Prepare tools for next step of discovery
 
-        userQuery = """
-        Take information, that will be added at the end of this query, and prepare one-liner that will scan each port with the tools that are designed 
-        for this specific port and service. Do not use nmap in this step.
+        userQuery = f"""
+        Take information, that will be added at the end of this query.
+        Prepare one-liner that will scan each open port of {currentHost.ipAddress} with the tools that are designed for this specific port and service.
+        Do not use nmap in this step.
         Information from nmap:
+        {detailedPorts}
         """
-        userQuery += detailedPorts
 
         messages = [{"role": "system", "content": systemPrompt}, {"role": "user", "content": userQuery},{"role": "assistant", "content": context}]
         chatCompletion = client.chat.completions.create(messages = messages, model = MODEL, temperature = TEMPERATURE)
         chatCompletion = chatCompletion.choices[0].message.content.strip()
         debug.write(chatCompletion + "\n")
 
-        #!!! Command
-        print(RED + chatCompletion + NC)
+        print(YELLOW + "[DEBUG3] " + RED + chatCompletion + NC)
 
         # Execute the command and capture the output
         #outputText = subprocess.run(chatCompletion, shell=True, capture_output=True, text=True)
         #scanServices = outputText.stdout
-        scanServices = "tools..."
+        scanServices = "...TBD"
 
         #!!! Output
         print(YELLOW + "[*] " + MAGENTA + "Specific Tools: " + NC)
