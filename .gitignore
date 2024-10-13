@@ -1,0 +1,9 @@
+# Ignore all of the log files
+*.log
+
+# Ignore hosts and findings
+hosts.txt
+nmap-aggresive-*.txt
+
+# Ignore debug file with outputs from OpenAI API
+openai-log.txt
