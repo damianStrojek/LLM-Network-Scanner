@@ -11,6 +11,7 @@ from openai import OpenAI
 # Constants
 TEMPERATURE = 0
 MODEL = "gpt-4o-mini"
+IMAGE_MODEL = "dall-e-3"
 RED='\033[1;31m'
 GRN='\033[1;32m'
 YEL='\033[1;33m'
@@ -81,7 +82,7 @@ def set_hosts():
 
 # Send request to OpenAI API and return response
 # Use pre-defined systemPrompt and context
-def send_request(client, userQuery, debug):
+def send_openai_request(client, userQuery, debug):
     systemPrompt = """
         You are a penetration tester for one of the biggest companies in the world."""
     context = """
@@ -106,14 +107,25 @@ def send_request(client, userQuery, debug):
     return chatCompletion
 
 # Send custom request to OpeniAI API and retun response
-def send_custom_request(client, systemPrompt, context, userQuery, debug):
+def send_openai_custom_request(client, systemPrompt, context, userQuery, debug):
     messages = [{"role": "system", "content": systemPrompt},
                 {"role": "user", "content": userQuery},
                 {"role": "assistant", "content": context}]
     chatCompletion = client.chat.completions.create(messages = messages, model = MODEL, temperature = TEMPERATURE)
     chatCompletion = chatCompletion.choices[0].message.content.strip()
     debug.write(chatCompletion + "\n")
+    
     return chatCompletion
+
+# Send request to image generation model
+def send_dalle_request(client, userQuery):
+    response = client.images.generate(model=IMAGE_MODEL, prompt=userQuery, 
+        size="1024x1024", quality="standard", n=1)
+    imageUrl = response.data[0].url
+    
+    print(YEL + "[*] " + MAG + "Your image is located at: " + imageUrl + NC)
+    
+    return
 
 # Print out welcoming banner
 def create_banner(client, debug):
@@ -126,7 +138,7 @@ def create_banner(client, debug):
     userQuery = "Return me a banner for application called 'LLMNS'. Also, include current date, time, and geo-localization."
     
     debug.write("\n" + "#" * 50 + "\n")
-    response = send_custom_request(client, systemPrompt, context, userQuery, debug)
+    response = send_openai_custom_request(client, systemPrompt, context, userQuery, debug)
     
     print("\n" + CYN + response + NC + "\n")
     return
@@ -158,7 +170,7 @@ def main():
     If some hosts are up and some hosts are down, print out only ip addresses of the active hosts.
     If all of hosts are down, output an empty string."""
     
-    response = send_request(client, userQuery, debug)
+    response = send_openai_request(client, userQuery, debug)
     onlineHosts = run_command(response)
 
     if(onlineHosts == ""):
@@ -190,8 +202,7 @@ def main():
         Output only numbers of ports that are either open or filtered on this specific host.
         Use sed tool to filter out the port numbers."""
 
-        response = send_request(client, userQuery, debug)
-
+        response = send_openai_request(client, userQuery, debug)
         openPorts = run_command(response)
         openPorts = openPorts.splitlines()
 
@@ -210,7 +221,7 @@ def main():
         gathering as much information as possible: {openPorts}
         Save this information locally into nmap-aggresive-{currentHost.ipAddress}.txt"""
 
-        response = send_request(client, userQuery, debug)
+        response = send_openai_request(client, userQuery, debug)
         aggresiveScan = run_command(response)
 
         print(YEL + "\n[*]" + MAG + " Aggresive scan overview: " + NC)
@@ -227,7 +238,7 @@ def main():
         Use only tools that does not need any interaction from the user.
         Information from nmap: {aggresiveScan}"""
         
-        response = send_request(client, userQuery, debug)
+        response = send_openai_request(client, userQuery, debug)
 
         #scanServices = run_command(response)
 
@@ -235,9 +246,17 @@ def main():
         #print(scanServices)
         
         # --------------------------
-        # 5. TBD: Visualize findings with the use of DALL-E-3
+        # 5. Visualize findings with the use of DALL-E-3
         # --------------------------
         
+        if(input(YEL + "[?] " + BLU + "Do you want to generate image (yes/no)? " + NC) == "yes"):
+            userQuery = f"""
+            Take information, that will be added at the end of this query.
+            Generate image that will visualize this information for executives in terms of risks.
+            I want it to be a nice graph that I can show to the non-technical stuff.
+            Information from nmap: {openPorts}"""
+            
+            send_dalle_request(client, userQuery)
         
 
     debug.close()

@@ -17,12 +17,9 @@ NC='\033[0m'
 BLUE='\033[1;34m'
 
 # Prompt the user for their OpenAI API key (security measures)
-def get_api_key():
-    apiKey = input(YELLOW + "[?] " + BLUE + "Please enter your OpenAI API key: " + NC)
-    return apiKey
-
-# Set the OpenAI API key
-def set_openai_api_key(apiKey):
+# and Set the OpenAI API key
+def set_openai_api_key():
+    apiKey = input(YEL + "[?] " + BLU + "Please enter your OpenAI API key: " + NC)
     openai.api_key = apiKey
     client = OpenAI(api_key=apiKey)
     return client
@@ -34,8 +31,7 @@ def main():
     input(YELLOW + "[!] " + RED + "Be careful!!! Each query costs around 0.04$!" + NC)
     
     # Set the OpenAI API key
-    apiKey = get_api_key()
-    client = set_openai_api_key(apiKey)
+    client = set_openai_api_key()
     
     promptText = input(YELLOW + "[?] " + BLUE + "Please enter your query: " + NC)
     
