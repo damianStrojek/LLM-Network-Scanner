@@ -9,6 +9,7 @@ import subprocess
 from openai import OpenAI
 
 # Constants
+DEBUG = 0
 TEMPERATURE = 0
 MODEL = "gpt-4o-mini"
 IMAGE_MODEL = "dall-e-3"
@@ -58,14 +59,17 @@ class NetworkHost:
 # Prompt the user for their OpenAI API key (security measures)
 # and Set the OpenAI API key
 def set_openai_api_key():
-    apiKey = input(YEL + "[?] " + BLU + "Please enter your OpenAI API key: " + NC)
+    apiKey = input(YEL + "\n[?] " + BLU + "Please enter your OpenAI API key: " + NC)
     openai.api_key = apiKey
     client = OpenAI(api_key=apiKey)
     return client
 
 # Set hosts that will be scanned
 def set_hosts():
-    userInput = input(YEL + "[?] " + BLU + "Please enter host or hosts (text file) to be scanned: " + NC)
+    userInput = input(YEL + "\n[?] " + BLU + "Please enter host or hosts (text file) to be scanned: " + NC)
+
+    if userInput == "":
+        userInput = "hosts.txt"
 
     if userInput.endswith(".txt"):
         try:
@@ -84,9 +88,8 @@ def set_hosts():
                 print(YEL + "[!] " + RED + "File doesn't exist in current directory or './files/'." + NC)
                 exit()
 
-    host = userInput.strip()
-    print(f"Given host: {host}")
-    return host
+    print(YEL + "[!] " + RED + "Source file must be a text (.txt) file." + NC)
+    exit()
 
 # Send request to OpenAI API and return response
 # Use pre-defined systemPrompt and context
@@ -110,7 +113,7 @@ def send_openai_request(client, userQuery, debug):
     chatCompletion = chatCompletion.choices[0].message.content.strip()
     debug.write(chatCompletion + "\n")
     
-    print(YEL + "[DEBUG] " + RED + chatCompletion + NC)
+    if(DEBUG): print(YEL + "[DEBUG] " + RED + chatCompletion + NC)
     
     return chatCompletion
 
@@ -200,7 +203,7 @@ def main():
         
         print(GRN + "\n###")
         print(YEL + "[*] " + MAG + "Scanning host " + ORN + currentHost.ipAddress)
-        print(GRN + "###\n" + NC)
+        print(GRN + "###" + NC)
 
         # --------------------------
         # 2. Gather information about open ports on online hosts
@@ -233,7 +236,7 @@ def main():
         response = send_openai_request(client, userQuery, debug)
         aggresiveScan = run_command(response)
 
-        print(YEL + "\n[*]" + MAG + " Aggresive scan overview: " + NC)
+        print(YEL + "\n[*]" + MAG + " Aggresive scan overview:\n" + NC)
         print(ITA + aggresiveScan + NC)
 
         # --------------------------
@@ -249,7 +252,6 @@ def main():
         Information from nmap: {aggresiveScan}"""
         
         response = send_openai_request(client, userQuery, debug)
-
         #scanServices = run_command(response)
 
         print(YEL + "\n[*] " + MAG + "Specific commands that can be used to test host " + ORN + currentHost.ipAddress + MAG + ": " + NC)
@@ -279,7 +281,7 @@ def main():
         You are tasked with creating a set of recommendations for a company that you are currently pentesting.
         You should write recommendations basing on informations that are provided in user query.
         You should be strict and write only the recommendations. Nothing more.
-        Use .txt format without any formatting."""
+        Use text format without any formatting."""
         
         userQuery = f"""
         Take information, that will be added at the end of this query.
@@ -288,7 +290,7 @@ def main():
         
         response = send_custom_openai_request(client, systemPrompt, context, userQuery, debug)
         
-        print(YEL + "\n[*] " + MAG + "Recommendations: ")
+        print(YEL + "\n[*] " + MAG + "Recommendations:\n")
         print(GRN + response + NC)
         
         # --------------------------
