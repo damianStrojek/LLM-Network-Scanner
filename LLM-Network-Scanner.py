@@ -69,12 +69,20 @@ def set_hosts():
 
     if userInput.endswith(".txt"):
         try:
+            # First attempt: Check the current directory
             with open(userInput, 'r') as file:
                 hosts = file.read()
-            return hosts
+                return hosts
         except FileNotFoundError:
-            print(f"[!] File {userInput} doesn't exist.")
-            exit()
+            try:
+                # Second attempt: Check the ./files/ directory
+                with open('./files/' + userInput, 'r') as file:
+                    hosts = file.read()
+                    return hosts
+            except FileNotFoundError:
+                # If the file isn't found in either directory, raise an exception
+                print(YEL + "[!] " + RED + "File doesn't exist in current directory or './files/'." + NC)
+                exit()
 
     host = userInput.strip()
     print(f"Given host: {host}")
@@ -107,7 +115,7 @@ def send_openai_request(client, userQuery, debug):
     return chatCompletion
 
 # Send custom request to OpeniAI API and retun response
-def send_openai_custom_request(client, systemPrompt, context, userQuery, debug):
+def send_custom_openai_request(client, systemPrompt, context, userQuery, debug):
     messages = [{"role": "system", "content": systemPrompt},
                 {"role": "user", "content": userQuery},
                 {"role": "assistant", "content": context}]
@@ -118,12 +126,13 @@ def send_openai_custom_request(client, systemPrompt, context, userQuery, debug):
     return chatCompletion
 
 # Send request to image generation model
-def send_dalle_request(client, userQuery):
+def send_dalle_request(client, userQuery, debug):
     response = client.images.generate(model=IMAGE_MODEL, prompt=userQuery, 
         size="1024x1024", quality="standard", n=1)
     imageUrl = response.data[0].url
     
     print(YEL + "[*] " + MAG + "Your image is located at: " + imageUrl + NC)
+    debug.write("Image URL: " + imageUrl + "\n")
     
     return
 
@@ -138,7 +147,7 @@ def create_banner(client, debug):
     userQuery = "Return me a banner for application called 'LLMNS'. Also, include current date, time, and geo-localization."
     
     debug.write("\n" + "#" * 50 + "\n")
-    response = send_openai_custom_request(client, systemPrompt, context, userQuery, debug)
+    response = send_custom_openai_request(client, systemPrompt, context, userQuery, debug)
     
     print("\n" + CYN + response + NC + "\n")
     return
@@ -151,7 +160,7 @@ def run_command(response):
 
 # Main function
 def main():
-    debug = open('openai-log.txt', 'a')
+    debug = open('./files/openai-log.txt', 'a')
 
     # Set the OpenAI API key, hosts, and print welcoming banner
     client = set_openai_api_key()
@@ -174,10 +183,10 @@ def main():
     onlineHosts = run_command(response)
 
     if(onlineHosts == ""):
-        print(YEL + "[!] " + RED + "All hosts are down" + NC)
+        print(YEL + "\n[!] " + RED + "All hosts are down." + NC)
         exit()
     else:
-        print(YEL + "[*] " + MAG + "Following hosts are up: " + ORN + onlineHosts.strip().replace('\n', ', ') + NC)
+        print(YEL + "\n[*] " + MAG + "Following hosts are up: " + ORN + onlineHosts.strip().replace('\n', ', ') + NC)
 
     ipAddresses = onlineHosts.splitlines()
 
@@ -207,7 +216,7 @@ def main():
         openPorts = openPorts.splitlines()
 
         if(openPorts == ""):
-            print(YEL + "[!] " + RED + "No open ports." + NC)
+            print(YEL + "\n[!] " + RED + "No open ports." + NC)
             exit()
         else:
             for port in openPorts: currentHost.add_port(port=port)
@@ -219,7 +228,7 @@ def main():
         userQuery = f"""
         Take following ports that are open on host {currentHost.ipAddress} and scan them aggressively 
         gathering as much information as possible: {openPorts}
-        Save this information locally into nmap-aggresive-{currentHost.ipAddress}.txt"""
+        Save this information locally into ./files/nmap-aggresive-{currentHost.ipAddress}.txt"""
 
         response = send_openai_request(client, userQuery, debug)
         aggresiveScan = run_command(response)
@@ -236,27 +245,62 @@ def main():
         Prepare one-liner that will scan each open port of {currentHost.ipAddress} with the tools that 
         are designed for this specific port and service. Do not use nmap in this step.
         Use only tools that does not need any interaction from the user.
+        In this one-liner everything should be done one after another.
         Information from nmap: {aggresiveScan}"""
         
         response = send_openai_request(client, userQuery, debug)
 
         #scanServices = run_command(response)
 
-        print(YEL + "[*] " + MAG + "Specific tools: " + NC)
-        #print(scanServices)
+        print(YEL + "\n[*] " + MAG + "Specific commands that can be used to test host " + ORN + currentHost.ipAddress + MAG + ": " + NC)
+        print(ITA + response + NC)
         
         # --------------------------
         # 5. Visualize findings with the use of DALL-E-3
         # --------------------------
         
-        if(input(YEL + "[?] " + BLU + "Do you want to generate image (yes/no)? " + NC) == "yes"):
+        if(input(YEL + "\n[?] " + BLU + "Do you want to generate image (yes/no)? " + NC) == "yes"):
             userQuery = f"""
             Take information, that will be added at the end of this query.
             Generate image that will visualize this information for executives in terms of risks.
             I want it to be a nice graph that I can show to the non-technical stuff.
             Information from nmap: {openPorts}"""
+                    
+            send_dalle_request(client, userQuery, debug)
             
-            send_dalle_request(client, userQuery)
+        # --------------------------
+        # 6. Recommendations for system administrator
+        # --------------------------
+        
+        systemPrompt = """
+        You are a penetration tester for one of the biggest companies in the world."""
+        
+        context = """
+        You are tasked with creating a set of recommendations for a company that you are currently pentesting.
+        You should write recommendations basing on informations that are provided in user query.
+        You should be strict and write only the recommendations. Nothing more.
+        Use .txt format without any formatting."""
+        
+        userQuery = f"""
+        Take information, that will be added at the end of this query.
+        Prepare cyber security recommendations based on this information.
+        Information from nmap: {aggresiveScan}"""
+        
+        response = send_custom_openai_request(client, systemPrompt, context, userQuery, debug)
+        
+        print(YEL + "\n[*] " + MAG + "Recommendations: ")
+        print(GRN + response + NC)
+        
+        # --------------------------
+        # 7. Narrative Summary with GPT-4 (???)
+        # --------------------------
+        
+        
+        
+        # --------------------------
+        # 8. 
+        # --------------------------
+        
         
 
     debug.close()
