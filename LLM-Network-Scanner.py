@@ -12,7 +12,7 @@ from openai import OpenAI
 from fpdf import FPDF
 
 # Constants
-DEBUG = 1
+DEBUG = 0
 TEMPERATURE = 0
 MODEL = "gpt-4o-mini"
 IMAGE_MODEL = "dall-e-3"
