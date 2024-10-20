@@ -6,10 +6,13 @@
 # Imports
 import openai
 import subprocess
+import datetime
+import textwrap
 from openai import OpenAI
+from fpdf import FPDF
 
 # Constants
-DEBUG = 0
+DEBUG = 1
 TEMPERATURE = 0
 MODEL = "gpt-4o-mini"
 IMAGE_MODEL = "dall-e-3"
@@ -25,16 +28,19 @@ NC='\033[0m'
 
 # General class for a single host in the network
 class NetworkHost:
-    def __init__(self, ipAddress, openPorts=None, services=None):
+    def __init__(self, ipAddress, openPorts=None, recommendations=None):
         self.ipAddress = ipAddress
         self.openPorts = openPorts if openPorts else []
-        self.services = services if services else []
+        self.recommendations = recommendations if recommendations else []
 
     def add_port(self, port, service=None):
         if port not in self.openPorts:
             self.openPorts.append(port)
             if service:
                 self.services[port] = service
+
+    def add_recommendation(self, recommendation):
+        self.recommendations = recommendation
 
     def remove_port(self, port):
         if port in self.openPorts:
@@ -45,16 +51,61 @@ class NetworkHost:
     def list_ports(self):
         return self.openPorts
 
-    def list_services(self):
-        return self.services
+    def list_recommendations(self):
+        return self.recommendations
 
     def debug(self):
-        print(f"Host IP: {self.ipAddress}\nOpen Ports: {self.openPorts}\nServices: {self.services}")
+        print(f"Host IP: {self.ipAddress}\nOpen Ports: {self.openPorts}\rRecommendations: {self.recommendations}")
         return
 
     def __str__(self):
-        hostInfo = f"Host IP: {self.ipAddress}\nOpen Ports: {self.openPorts}\nServices: {self.services}"
+        hostInfo = f"Host IP: {self.ipAddress}\nOpen Ports: {self.openPorts}\rRecommendations: {self.recommendations}"
         return hostInfo
+
+# Create a class inheriting from FPDF for custom functions
+class PDFReport(FPDF):
+    def header(self):
+        self.set_font('Arial', 'B', 16)
+        self.cell(0, 10, 'Vulnerability Scan Report', ln=True, align='C')
+
+    def footer(self):
+        self.set_y(-15)
+        self.set_font('Arial', 'I', 8)
+        self.cell(0, 10, f'Page {self.page_no()}', 0, 0, 'C')
+
+    def add_report_title(self):
+        self.set_font('Arial', 'B', 12)
+        self.cell(0, 10, f'Report generated: {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}', ln=True)
+        self.ln(10)  # Line break
+
+    def add_host_report(self, hostData):
+        # Host details
+        self.set_font('Arial', 'B', 12)
+        self.cell(0, 10, f'Host: {hostData["host"]} ({hostData["status"]})', ln=True)
+
+        # Open ports
+        self.set_font('Arial', 'B', 10)
+        self.cell(0, 10, 'Open Ports:', ln=True)
+        self.set_font('Arial', '', 10)
+        self.cell(0, 10, ', '.join(map(str, hostData['openPorts'])), ln=True)
+
+        # Recommendations
+        if hostData['recommendations']:
+            self.set_font('Arial', 'B', 10)
+            self.cell(0, 10, 'Recommendations:', ln=True)
+            self.set_font('Arial', '', 10)
+            
+            # Split recommendations string by line breaks
+            recommendations = hostData['recommendations'].split('\n\n')
+            
+            for rec in recommendations:
+                # Wrap the recommendation text to fit into the PDF page
+                wrappedRecommendation = wrap_text(rec)
+                self.multi_cell(0, 10, wrappedRecommendation)
+        else:
+            self.cell(0, 10, 'No recommendations available.', ln=True)
+
+        self.ln(10)  # Add space before next host
 
 # Prompt the user for their OpenAI API key (security measures)
 # and Set the OpenAI API key
@@ -161,6 +212,25 @@ def run_command(response):
     output = outputText.stdout
     return output
 
+# Create the PDF report
+def generate_pdf_report(scanResults, outputFilename='./files/Penetration-Testing-Report.pdf'):
+    pdf = PDFReport()
+    pdf.add_page()
+    pdf.add_report_title()
+
+    for host in scanResults:
+        if host != scanResults[0]:
+            pdf.add_page()
+        pdf.add_host_report(host)
+    
+    pdf.output(outputFilename)
+    print(YEL + "\n[*] " + MAG + "Report saved as " + outputFilename + "." + NC)
+    return
+
+# Helper function to wrap long recommendation text
+def wrap_text(text, width=100):
+    return '\n'.join(textwrap.wrap(text, width))
+
 # Main function
 def main():
     debug = open('./files/openai-log.txt', 'a')
@@ -258,7 +328,7 @@ def main():
         print(ITA + response + NC)
         
         # --------------------------
-        # 5. Visualize findings with the use of DALL-E-3
+        # 5. Visualize findings with the use of DALL-E-3 (optional)
         # --------------------------
         
         if(input(YEL + "\n[?] " + BLU + "Do you want to generate image (yes/no)? " + NC) == "yes"):
@@ -280,7 +350,8 @@ def main():
         context = """
         You are tasked with creating a set of recommendations for a company that you are currently pentesting.
         You should write recommendations basing on informations that are provided in user query.
-        You should be strict and write only the recommendations. Nothing more.
+        You should be strict and write only the recommendations.
+        Before a single recommendation, write the network port number that this recommendation applies to.
         Use text format without any formatting."""
         
         userQuery = f"""
@@ -288,23 +359,37 @@ def main():
         Prepare cyber security recommendations based on this information.
         Information from nmap: {aggresiveScan}"""
         
-        response = send_custom_openai_request(client, systemPrompt, context, userQuery, debug)
+        recommendations = send_custom_openai_request(client, systemPrompt, context, userQuery, debug)
+        currentHost.add_recommendation(recommendations)
         
         print(YEL + "\n[*] " + MAG + "Recommendations:\n")
-        print(GRN + response + NC)
+        print(GRN + recommendations + NC)
         
         # --------------------------
         # 7. Narrative Summary with GPT-4 (???)
         # --------------------------
         
+        # ...
         
         
-        # --------------------------
-        # 8. 
-        # --------------------------
-        
-        
+    # --------------------------
+    # 8. PDF Report with All Hosts
+    # --------------------------
+    scanData = []
 
+    for currentHost in activeHosts:
+        
+        hostReport = {
+            "host": currentHost.ipAddress,
+            "status": "online",
+            "openPorts": currentHost.openPorts,
+            "recommendations": currentHost.recommendations
+        }
+        
+        scanData.append(hostReport)
+
+    generate_pdf_report(scanData)
+        
     debug.close()
     exit()
 

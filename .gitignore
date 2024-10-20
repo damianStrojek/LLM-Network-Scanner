@@ -7,3 +7,6 @@ nmap-aggresive-*.txt
 
 # Ignore debug file with outputs from OpenAI API
 openai-log.txt
+
+# Ignore reports
+*.pdf
