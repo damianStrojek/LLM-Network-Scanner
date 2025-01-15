@@ -12,9 +12,9 @@ from openai import OpenAI
 from fpdf import FPDF
 
 # Constants
-DEBUG = 0
+DEBUG = 1
 TEMPERATURE = 0
-MODEL = "gpt-4o-mini"
+MODEL = "gpt-4o"
 IMAGE_MODEL = "dall-e-3"
 RED='\033[1;31m'
 GRN='\033[1;32m'
@@ -150,9 +150,9 @@ def send_openai_request(client, userQuery, debug):
     context = """
         You are tasked with coming up with technical answers to given questions.
         The idea for following prompts is to prepare and execute an infrastracture penetration test on given IP address.
-        When said, create only commands that can be copy-pasted into /bin/bash console on Kali Linux 2024 system.
+        Create only commands that can be copy-pasted into /bin/bash console on Kali Linux 2024 system.
+        In the response, give only the prepared commands, nothing else if not asked to do something else.
         You are allowed to use only public tools that will not create a Denial-of-Service attack.
-        When not said how to print out the results, print only the console command.
         Do not add back ticks.
         Do not add any python or bash comments when answering.
         Use sudo when you have to."""
@@ -160,6 +160,7 @@ def send_openai_request(client, userQuery, debug):
     messages = [{"role": "system", "content": systemPrompt},
                 {"role": "user", "content": userQuery},
                 {"role": "assistant", "content": context}]
+
     chatCompletion = client.chat.completions.create(messages = messages, model = MODEL, temperature = TEMPERATURE)
     chatCompletion = chatCompletion.choices[0].message.content.strip()
     debug.write(chatCompletion + "\n")
@@ -173,6 +174,7 @@ def send_custom_openai_request(client, systemPrompt, context, userQuery, debug):
     messages = [{"role": "system", "content": systemPrompt},
                 {"role": "user", "content": userQuery},
                 {"role": "assistant", "content": context}]
+
     chatCompletion = client.chat.completions.create(messages = messages, model = MODEL, temperature = TEMPERATURE)
     chatCompletion = chatCompletion.choices[0].message.content.strip()
     debug.write(chatCompletion + "\n")
@@ -246,13 +248,14 @@ def main():
     # --------------------------
     
     userQuery = f"""
-    Print out a command to test if all of the following hosts are up or not: {hosts}
+    Prepare a command to test if all of the following hosts are up or not: {hosts}
     You should use ping.
-    The command should print out all of the hosts that are up, one per line.
-    If some hosts are up and some hosts are down, print out only ip addresses of the active hosts.
+    The command should print out all of the IP addresses that are up, one per line. Nothing else than IP addresses.
+    If some hosts are up and some hosts are down, print out only ip addresses of the active.
     If all of hosts are down, output an empty string."""
-    
+
     response = send_openai_request(client, userQuery, debug)
+
     onlineHosts = run_command(response)
 
     if(onlineHosts == ""):
@@ -317,7 +320,6 @@ def main():
         Take information, that will be added at the end of this query.
         Prepare one-liner that will scan each open port of {currentHost.ipAddress} with the tools that 
         are designed for this specific port and service. Do not use nmap in this step.
-        Use only tools that does not need any interaction from the user.
         In this one-liner everything should be done one after another.
         Information from nmap: {aggresiveScan}"""
         
