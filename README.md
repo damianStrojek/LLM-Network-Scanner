@@ -24,7 +24,7 @@ LLM Network Scanner makes use of:
 - OpenAI Python library (`pip3 install openai`)
 - FPDF Python library (`pip3 install fpdf`)
 
-## Testing
+## Testing on Docker
 
 We have used [Docker](https://www.docker.com/) environement with [opencanary](https://github.com/thinkst/opencanary) instance to locally test Network Scanner.
 
@@ -32,7 +32,7 @@ We have used [Docker](https://www.docker.com/) environement with [opencanary](ht
 sudo docker-compose up latest
 ```
 
-Opencanary config files:
+Config files:
 
 ```bash
 # docker-compose.yml
@@ -61,6 +61,20 @@ ports:
 "https.enabled": false,
 "ftp.enabled": true,
 "http.enabled": true,
+```
+
+## Testing without Docker
+
+Because `Docker-compose` is sometimes really hard to install, there is also way to run python environment and start up `opencanaryd`:
+
+```bash
+sudo apt-get install python3-dev python3-pip python3-virtualenv python3-venv python3-scapy libssl-dev libpcap-dev
+virtualenv env/
+. env/bin/activate
+pip install opencanary
+opencanaryd --copyconfig
+sudo nano /etc/opencanaryd/copencanary.conf
+opencanary --start
 ```
 
 ## Disclaimer
