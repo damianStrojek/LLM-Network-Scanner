@@ -1,6 +1,6 @@
 #
 # LLM Network Scanner
-# Copyright (C) 2024 Damian Strojek
+# Copyright (C) 2024 Damian Strojek, Hubert Piotroski, Marcin Szachowski 
 #
 
 # Imports
@@ -12,10 +12,12 @@ from openai import OpenAI
 from fpdf import FPDF
 
 # Constants
-DEBUG = 1
+DEBUG = True
 TEMPERATURE = 0
 MODEL = "gpt-4o"
 IMAGE_MODEL = "dall-e-3"
+
+# Color constants
 RED='\033[1;31m'
 GRN='\033[1;32m'
 YEL='\033[1;33m'
@@ -32,24 +34,29 @@ class NetworkHost:
         self.ipAddress = ipAddress
         self.openPorts = openPorts if openPorts else []
         self.recommendations = recommendations if recommendations else []
+        return
 
     def add_port(self, port, service=None):
         if port not in self.openPorts:
             self.openPorts.append(port)
             if service:
                 self.services[port] = service
+        return
 
     def add_recommendation(self, recommendation):
         self.recommendations = recommendation
+        return
 
     def remove_port(self, port):
         if port in self.openPorts:
             self.openPorts.remove(port)
             if port in self.services:
                 del self.services[port]
+        return
 
-    def list_ports(self):
-        return self.openPorts
+    def print_open_ports(self):
+        print(YEL + "\n[*] " + MAG + "Discovered open ports: " + ORN + ",".join(str(port) for port in self.openPorts))
+        return
 
     def list_recommendations(self):
         return self.recommendations
@@ -164,7 +171,7 @@ def send_openai_request(client, userQuery, debug):
     chatCompletion = chatCompletion.choices[0].message.content.strip()
     debug.write(chatCompletion + "\n")
     
-    if(DEBUG): print(YEL + "[DEBUG] " + RED + chatCompletion + NC)
+    if(DEBUG): print(YEL + "\n[DEBUG] " + RED + chatCompletion + NC)
     
     return chatCompletion
 
@@ -200,7 +207,9 @@ def create_banner(client, debug):
         Avoid using backticks.
         Do not add any comments.
         Start with an ASCII art image representing your choice of design."""
-    userQuery = "Return me a banner for application called 'LLMNS'. Also, include current date, time, and geo-localization."
+    userQuery = """
+        Return me a banner for application called LLMNS (Large Language Models Network Scanner).
+        Also, include current date, time, and geo-localization."""
     
     debug.write("\n" + "#" * 50 + "\n")
     response = send_custom_openai_request(client, systemPrompt, context, userQuery, debug)
@@ -283,28 +292,30 @@ def main():
         # --------------------------
 
         userQuery = f"""
-        Scan 50 top ports (use --top-ports and don't use -oG) of host {currentHost.ipAddress}.
-        Output only numbers of ports that are either open or filtered on this specific host.
-        Use sed tool to filter out the port numbers."""
+            Scan 100 top ports (use --top-ports and don't use -oG) of host {currentHost.ipAddress}.
+            Output only numbers of ports that are either open or filtered on this specific host.
+            Use sed tool to filter out the port numbers."""
 
         response = send_openai_request(client, userQuery, debug)
         openPorts = run_command(response)
         openPorts = openPorts.splitlines()
 
         if(openPorts == ""):
-            print(YEL + "\n[!] " + RED + "No open ports." + NC)
-            exit()
+            print(YEL + "\n[!] " + RED + "No open ports for this host." + NC)
+            continue
         else:
             for port in openPorts: currentHost.add_port(port=port)
+
+        currentHost.print_open_ports()
 
         # --------------------------
         # 3. Aggresively scan open ports in search of vulnerabilities
         # --------------------------
 
         userQuery = f"""
-        Take following ports that are open on host {currentHost.ipAddress} and scan them aggressively 
-        gathering as much information as possible: {openPorts}
-        Save this information locally into ./files/nmap-aggresive-{currentHost.ipAddress}.txt"""
+            Take following ports that are open on host {currentHost.ipAddress} and scan them aggressively 
+            gathering as much information as possible: {openPorts}
+            Save this information locally into ./files/nmap-aggresive-{currentHost.ipAddress}.txt"""
 
         response = send_openai_request(client, userQuery, debug)
         aggresiveScan = run_command(response)
@@ -317,11 +328,11 @@ def main():
         # --------------------------
 
         userQuery = f"""
-        Take information, that will be added at the end of this query.
-        Prepare one-liner that will scan each open port of {currentHost.ipAddress} with the tools that 
-        are designed for this specific port and service. Do not use nmap in this step.
-        In this one-liner everything should be done one after another.
-        Information from nmap: {aggresiveScan}"""
+            Use the information provided to craft a one-liner that scans each open port on {currentHost.ipAddress}.
+            Utilize tools specifically designed for the services on those ports.
+            Do not use nmap.
+            Ensure all actions are executed sequentially within the one-liner.
+            Incorporate details from the {aggresiveScan} results."""
         
         response = send_openai_request(client, userQuery, debug)
         #scanServices = run_command(response)
@@ -335,10 +346,9 @@ def main():
         
         if(input(YEL + "\n[?] " + BLU + "Do you want to generate image (yes/no)? " + NC) == "yes"):
             userQuery = f"""
-            Take information, that will be added at the end of this query.
-            Generate image that will visualize this information for executives in terms of risks.
-            I want it to be a nice graph that I can show to the non-technical stuff.
-            Information from nmap: {openPorts}"""
+                Create an image that visualizes the risks associated with the information provided.
+                Use a clear and visually appealing graph suitable for presentation to non-technical executives.
+                Base the visualization on the data from the nmap scan: {openPorts}"""
                     
             send_dalle_request(client, userQuery, debug)
             
@@ -347,19 +357,18 @@ def main():
         # --------------------------
         
         systemPrompt = """
-        You are a penetration tester for one of the biggest companies in the world."""
+            You are a penetration tester for one of the biggest companies in the world."""
         
         context = """
-        You are tasked with creating a set of recommendations for a company that you are currently pentesting.
-        You should write recommendations basing on informations that are provided in user query.
-        You should be strict and write only the recommendations.
-        Before a single recommendation, write the network port number that this recommendation applies to.
-        Use text format without any formatting."""
+            Your task is to create a set of recommendations for the company you are currently pentesting.
+            Base your recommendations strictly on the information provided in the user's query.
+            Each recommendation should be preceded by the applicable network port number.
+            Use plain text without any additional formatting."""
         
         userQuery = f"""
-        Take information, that will be added at the end of this query.
-        Prepare cyber security recommendations based on this information.
-        Information from nmap: {aggresiveScan}"""
+            Take information that will be added at the end of this query.
+            Prepare cybersecurity recommendations based on this information.
+            Information from nmap: {aggresiveScan}"""
         
         recommendations = send_custom_openai_request(client, systemPrompt, context, userQuery, debug)
         currentHost.add_recommendation(recommendations)
@@ -377,6 +386,7 @@ def main():
     # --------------------------
     # 8. PDF Report with All Hosts
     # --------------------------
+    
     scanData = []
 
     for currentHost in activeHosts:
@@ -392,6 +402,8 @@ def main():
 
     generate_pdf_report(scanData)
         
+    print(YEL + "\n[*] " + MAG + "The application is terminating .\n")
+
     debug.close()
     exit()
 
