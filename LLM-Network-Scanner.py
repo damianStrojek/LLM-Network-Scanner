@@ -1,6 +1,6 @@
 #
 # LLM Network Scanner
-# Copyright (C) 2024 Damian Strojek
+# Copyright (C) 2024 Damian Strojek, Hubert Piotroski, Marcin Szachowski 
 #
 
 # Imports
@@ -12,10 +12,12 @@ from openai import OpenAI
 from fpdf import FPDF
 
 # Constants
-DEBUG = 0
+DEBUG = True
 TEMPERATURE = 0
-MODEL = "gpt-4o-mini"
+MODEL = "gpt-4o"
 IMAGE_MODEL = "dall-e-3"
+
+# Color constants
 RED='\033[1;31m'
 GRN='\033[1;32m'
 YEL='\033[1;33m'
@@ -32,24 +34,29 @@ class NetworkHost:
         self.ipAddress = ipAddress
         self.openPorts = openPorts if openPorts else []
         self.recommendations = recommendations if recommendations else []
+        return
 
     def add_port(self, port, service=None):
         if port not in self.openPorts:
             self.openPorts.append(port)
             if service:
                 self.services[port] = service
+        return
 
     def add_recommendation(self, recommendation):
         self.recommendations = recommendation
+        return
 
     def remove_port(self, port):
         if port in self.openPorts:
             self.openPorts.remove(port)
             if port in self.services:
                 del self.services[port]
+        return
 
-    def list_ports(self):
-        return self.openPorts
+    def print_open_ports(self):
+        print(YEL + "\n[*] " + MAG + "Discovered open ports: " + ORN + ",".join(str(port) for port in self.openPorts))
+        return
 
     def list_recommendations(self):
         return self.recommendations
@@ -148,23 +155,23 @@ def send_openai_request(client, userQuery, debug):
     systemPrompt = """
         You are a penetration tester for one of the biggest companies in the world."""
     context = """
-        You are tasked with coming up with technical answers to given questions.
-        The idea for following prompts is to prepare and execute an infrastracture penetration test on given IP address.
-        When said, create only commands that can be copy-pasted into /bin/bash console on Kali Linux 2024 system.
-        You are allowed to use only public tools that will not create a Denial-of-Service attack.
-        When not said how to print out the results, print only the console command.
-        Do not add back ticks.
-        Do not add any python or bash comments when answering.
-        Use sudo when you have to."""
+        Generate technical answers for the provided questions.
+        Focus on preparing and executing an infrastructure penetration test for a specified IP address.
+        Provide commands that can be directly executed in the /bin/bash console on a Kali Linux 2024 system.
+        Only include the prepared commands in your response unless additional instructions are given.
+        Use only public tools that do not cause Denial-of-Service attacks.
+        Include sudo where necessary.
+        Do not add Python or Bash comments, and avoid using backticks."""
     
     messages = [{"role": "system", "content": systemPrompt},
                 {"role": "user", "content": userQuery},
                 {"role": "assistant", "content": context}]
+
     chatCompletion = client.chat.completions.create(messages = messages, model = MODEL, temperature = TEMPERATURE)
     chatCompletion = chatCompletion.choices[0].message.content.strip()
     debug.write(chatCompletion + "\n")
     
-    if(DEBUG): print(YEL + "[DEBUG] " + RED + chatCompletion + NC)
+    if(DEBUG): print(YEL + "\n[DEBUG] " + RED + chatCompletion + NC)
     
     return chatCompletion
 
@@ -173,6 +180,7 @@ def send_custom_openai_request(client, systemPrompt, context, userQuery, debug):
     messages = [{"role": "system", "content": systemPrompt},
                 {"role": "user", "content": userQuery},
                 {"role": "assistant", "content": context}]
+
     chatCompletion = client.chat.completions.create(messages = messages, model = MODEL, temperature = TEMPERATURE)
     chatCompletion = chatCompletion.choices[0].message.content.strip()
     debug.write(chatCompletion + "\n")
@@ -194,11 +202,14 @@ def send_dalle_request(client, userQuery, debug):
 def create_banner(client, debug):
     systemPrompt = "Your task is to return a banner that will be shown as the first thing after running the application."
     context = """
-    You should only return the text that can be instantly printed out. Not functions or anything else.
-    Do not add back ticks.
-    Do not add any python or bash comments when answering.
-    First thing shown should be a picture created in fancy ASCII text format representing whatever you want."""
-    userQuery = "Return me a banner for application called 'LLMNS'. Also, include current date, time, and geo-localization."
+        Return only the text that can be immediately printed.
+        Do not include functions or any additional code elements.
+        Avoid using backticks.
+        Do not add any comments.
+        Start with an ASCII art image representing your choice of design."""
+    userQuery = """
+        Return me a banner for application called LLMNS (Large Language Models Network Scanner).
+        Also, include current date, time, and geo-localization."""
     
     debug.write("\n" + "#" * 50 + "\n")
     response = send_custom_openai_request(client, systemPrompt, context, userQuery, debug)
@@ -246,13 +257,14 @@ def main():
     # --------------------------
     
     userQuery = f"""
-    Print out a command to test if all of the following hosts are up or not: {hosts}
-    You should use ping.
-    The command should print out all of the hosts that are up, one per line.
-    If some hosts are up and some hosts are down, print out only ip addresses of the active hosts.
-    If all of hosts are down, output an empty string."""
-    
+        Create a command to check the status of the following hosts: {hosts}.
+        Use ping to determine if each host is up.
+        The output should list only the IP addresses that are up, one per line.
+        If no hosts are up, the output should be empty.
+        Do not include any additional text or information beyond the IP addresses of active hosts."""
+
     response = send_openai_request(client, userQuery, debug)
+
     onlineHosts = run_command(response)
 
     if(onlineHosts == ""):
@@ -280,28 +292,30 @@ def main():
         # --------------------------
 
         userQuery = f"""
-        Scan 50 top ports (use --top-ports and don't use -oG) of host {currentHost.ipAddress}.
-        Output only numbers of ports that are either open or filtered on this specific host.
-        Use sed tool to filter out the port numbers."""
+            Scan 100 top ports (use --top-ports and don't use -oG) of host {currentHost.ipAddress}.
+            Output only numbers of ports that are either open or filtered on this specific host.
+            Use sed tool to filter out the port numbers."""
 
         response = send_openai_request(client, userQuery, debug)
         openPorts = run_command(response)
         openPorts = openPorts.splitlines()
 
         if(openPorts == ""):
-            print(YEL + "\n[!] " + RED + "No open ports." + NC)
-            exit()
+            print(YEL + "\n[!] " + RED + "No open ports for this host." + NC)
+            continue
         else:
             for port in openPorts: currentHost.add_port(port=port)
+
+        currentHost.print_open_ports()
 
         # --------------------------
         # 3. Aggresively scan open ports in search of vulnerabilities
         # --------------------------
 
         userQuery = f"""
-        Take following ports that are open on host {currentHost.ipAddress} and scan them aggressively 
-        gathering as much information as possible: {openPorts}
-        Save this information locally into ./files/nmap-aggresive-{currentHost.ipAddress}.txt"""
+            Take following ports that are open on host {currentHost.ipAddress} and scan them aggressively 
+            gathering as much information as possible: {openPorts}
+            Save this information locally into ./files/nmap-aggresive-{currentHost.ipAddress}.txt"""
 
         response = send_openai_request(client, userQuery, debug)
         aggresiveScan = run_command(response)
@@ -314,12 +328,11 @@ def main():
         # --------------------------
 
         userQuery = f"""
-        Take information, that will be added at the end of this query.
-        Prepare one-liner that will scan each open port of {currentHost.ipAddress} with the tools that 
-        are designed for this specific port and service. Do not use nmap in this step.
-        Use only tools that does not need any interaction from the user.
-        In this one-liner everything should be done one after another.
-        Information from nmap: {aggresiveScan}"""
+            Use the information provided to craft a one-liner that scans each open port on {currentHost.ipAddress}.
+            Utilize tools specifically designed for the services on those ports.
+            Do not use nmap.
+            Ensure all actions are executed sequentially within the one-liner.
+            Incorporate details from the {aggresiveScan} results."""
         
         response = send_openai_request(client, userQuery, debug)
         #scanServices = run_command(response)
@@ -333,10 +346,9 @@ def main():
         
         if(input(YEL + "\n[?] " + BLU + "Do you want to generate image (yes/no)? " + NC) == "yes"):
             userQuery = f"""
-            Take information, that will be added at the end of this query.
-            Generate image that will visualize this information for executives in terms of risks.
-            I want it to be a nice graph that I can show to the non-technical stuff.
-            Information from nmap: {openPorts}"""
+                Create an image that visualizes the risks associated with the information provided.
+                Use a clear and visually appealing graph suitable for presentation to non-technical executives.
+                Base the visualization on the data from the nmap scan: {openPorts}"""
                     
             send_dalle_request(client, userQuery, debug)
             
@@ -345,19 +357,18 @@ def main():
         # --------------------------
         
         systemPrompt = """
-        You are a penetration tester for one of the biggest companies in the world."""
+            You are a penetration tester for one of the biggest companies in the world."""
         
         context = """
-        You are tasked with creating a set of recommendations for a company that you are currently pentesting.
-        You should write recommendations basing on informations that are provided in user query.
-        You should be strict and write only the recommendations.
-        Before a single recommendation, write the network port number that this recommendation applies to.
-        Use text format without any formatting."""
+            Your task is to create a set of recommendations for the company you are currently pentesting.
+            Base your recommendations strictly on the information provided in the user's query.
+            Each recommendation should be preceded by the applicable network port number.
+            Use plain text without any additional formatting."""
         
         userQuery = f"""
-        Take information, that will be added at the end of this query.
-        Prepare cyber security recommendations based on this information.
-        Information from nmap: {aggresiveScan}"""
+            Take information that will be added at the end of this query.
+            Prepare cybersecurity recommendations based on this information.
+            Information from nmap: {aggresiveScan}"""
         
         recommendations = send_custom_openai_request(client, systemPrompt, context, userQuery, debug)
         currentHost.add_recommendation(recommendations)
@@ -375,6 +386,7 @@ def main():
     # --------------------------
     # 8. PDF Report with All Hosts
     # --------------------------
+    
     scanData = []
 
     for currentHost in activeHosts:
@@ -390,6 +402,8 @@ def main():
 
     generate_pdf_report(scanData)
         
+    print(YEL + "\n[*] " + MAG + "The application is terminating .\n")
+
     debug.close()
     exit()
 
