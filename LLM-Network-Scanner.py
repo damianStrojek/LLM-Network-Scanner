@@ -148,14 +148,13 @@ def send_openai_request(client, userQuery, debug):
     systemPrompt = """
         You are a penetration tester for one of the biggest companies in the world."""
     context = """
-        You are tasked with coming up with technical answers to given questions.
-        The idea for following prompts is to prepare and execute an infrastracture penetration test on given IP address.
-        Create only commands that can be copy-pasted into /bin/bash console on Kali Linux 2024 system.
-        In the response, give only the prepared commands, nothing else if not asked to do something else.
-        You are allowed to use only public tools that will not create a Denial-of-Service attack.
-        Do not add back ticks.
-        Do not add any python or bash comments when answering.
-        Use sudo when you have to."""
+        Generate technical answers for the provided questions.
+        Focus on preparing and executing an infrastructure penetration test for a specified IP address.
+        Provide commands that can be directly executed in the /bin/bash console on a Kali Linux 2024 system.
+        Only include the prepared commands in your response unless additional instructions are given.
+        Use only public tools that do not cause Denial-of-Service attacks.
+        Include sudo where necessary.
+        Do not add Python or Bash comments, and avoid using backticks."""
     
     messages = [{"role": "system", "content": systemPrompt},
                 {"role": "user", "content": userQuery},
@@ -196,10 +195,11 @@ def send_dalle_request(client, userQuery, debug):
 def create_banner(client, debug):
     systemPrompt = "Your task is to return a banner that will be shown as the first thing after running the application."
     context = """
-    You should only return the text that can be instantly printed out. Not functions or anything else.
-    Do not add back ticks.
-    Do not add any python or bash comments when answering.
-    First thing shown should be a picture created in fancy ASCII text format representing whatever you want."""
+        Return only the text that can be immediately printed.
+        Do not include functions or any additional code elements.
+        Avoid using backticks.
+        Do not add any comments.
+        Start with an ASCII art image representing your choice of design."""
     userQuery = "Return me a banner for application called 'LLMNS'. Also, include current date, time, and geo-localization."
     
     debug.write("\n" + "#" * 50 + "\n")
@@ -248,11 +248,11 @@ def main():
     # --------------------------
     
     userQuery = f"""
-    Prepare a command to test if all of the following hosts are up or not: {hosts}
-    You should use ping.
-    The command should print out all of the IP addresses that are up, one per line. Nothing else than IP addresses.
-    If some hosts are up and some hosts are down, print out only ip addresses of the active.
-    If all of hosts are down, output an empty string."""
+        Create a command to check the status of the following hosts: {hosts}.
+        Use ping to determine if each host is up.
+        The output should list only the IP addresses that are up, one per line.
+        If no hosts are up, the output should be empty.
+        Do not include any additional text or information beyond the IP addresses of active hosts."""
 
     response = send_openai_request(client, userQuery, debug)
 
